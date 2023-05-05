@@ -1,0 +1,72 @@
+module Test where
+
+import Main
+import Daml.Script
+import DA.Time
+import DA.Date
+
+setupHappyPath : Script ()
+setupHappyPath = script do 
+
+    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+    manager <- allocatePartyWithHint "The Manager" (PartyIdHint "The Manager")
+
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                manager 
+                employee = bob
+                quantity = 100000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+    
+    waterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
+    
+    submitMustFail bob do
+        exerciseCmd waterRequestCid AcceptAddWaterRequest
+
+    newWaterCid <- submit manager do
+        exerciseCmd waterRequestCid AcceptAddWaterRequest
+
+    submit manager do
+        exerciseCmd newWaterCid ConsumeWater with remQuantity = 30000.0
+
+    return ()
+    
+
+setupUnhappyPath : Script ()
+setupUnhappyPath = script do
+    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+    manager <- allocatePartyWithHint "The Manager" (PartyIdHint "The Manager")
+
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                manager 
+                employee = bob
+                quantity = 100000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+
+
+    --RequestAddWater test addQuantity less or equal 0 
+    --                supplier empty
+
+
+    --WaterConsumptionRequest remQuantity less or equal 0 
+
+
+
+    submitMustFail manager do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
+    
+    waterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
+
+    submitMustFail bob do
+        exerciseCmd waterRequestCid AcceptAddWaterRequest
+
+    return ()
+    
+    

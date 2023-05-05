@@ -1,0 +1,158 @@
+module Main where
+
+import DA.Exception
+
+type AddWaterRequestCid     = ContractId AddWaterRequest
+type ConsumeWaterRequestCid = ContractId ConsumeWaterRequest
+type FarmWaterStockCid      = ContractId FarmWaterStock
+type RejectedRequestCid     = ContractId RejectedRequest
+
+
+-- verify all sigs and obs
+-- verify timestamps
+
+-- Testing : 
+-- Test Revoke -> it should be right rn
+
+template FarmWaterStock
+    with
+        manager     : Party
+        employee    : Party
+        quantity    : Decimal
+        timestamp   : Time
+        farmWaterId : Text
+    where
+        signatory manager
+        observer employee
+
+        key (manager, farmWaterId) : (Party, Text)
+        maintainer key._1
+        
+        ensure quantity >= 0.0
+    
+        nonconsuming choice RequestAddWater : AddWaterRequestCid
+            with 
+                addQuantity : Decimal
+                supplier    : Text
+            controller employee
+            do
+                assertMsg "Quantity to be added cannot be 0 or less " $ addQuantity >= 0.0
+                assertMsg "Supplier field cannot be empty" $ supplier /= ""
+                create AddWaterRequest with  ..
+        
+        nonconsuming choice WaterConsumptionRequest : ConsumeWaterRequestCid
+            with
+                remQuantity : Decimal
+            controller employee 
+            do
+                assertMsg "Quantity to be consumed/ removed cannot be 0 or less " $ remQuantity >= 0.0
+                create ConsumeWaterRequest with 
+                    description = "Consumed 10000 watering potatoes"
+                    remQuantity
+                    ..
+
+        choice ConsumeWater : FarmWaterStockCid
+            with
+                remQuantity : Decimal
+            controller manager
+            do
+                assertMsg "Dear Farm Manager, the quantity to be consumed/ removed cannot be 0 or less " $ remQuantity >= 0.0
+                try do
+                create this with 
+                    quantity = quantity - remQuantity
+                catch PreconditionFailed msg -> 
+                        assertFail ("Water consumed("<> show remQuantity <>") cannot be higher than the current water ammount : " <> show quantity <> "")
+
+template AddWaterRequest
+    with
+        manager     : Party
+        employee    : Party
+        supplier    : Text
+        farmWaterId : Text
+        addQuantity : Decimal
+    where
+        signatory employee, manager
+        observer  manager
+
+        choice AcceptAddWaterRequest : FarmWaterStockCid
+            controller manager
+            do  
+                now <- getTime
+                
+                farmWaterStockCid <- findFarmWaterIdWithKey manager farmWaterId
+                farmWaterStock    <- fetch farmWaterStockCid
+                let oldQuantity = farmWaterStock.quantity
+                
+                archive farmWaterStockCid
+                create farmWaterStock with quantity = oldQuantity + addQuantity
+            
+        choice RejectAddWaterRequest : RejectedRequestCid
+            with
+                reason : Text
+            controller manager
+            do
+                now <- getTime
+
+                create RejectedRequest with
+                    manager
+                    employee
+                    reason
+                    opType    = "Add Water - Rejection"
+                    timestamp = now
+        
+        choice RevokeAddWaterRequest : ()
+            controller employee
+            do
+                return ()
+
+template ConsumeWaterRequest
+    with
+        manager     : Party
+        employee    : Party
+        remQuantity : Decimal
+        description : Text
+        farmWaterId : Text
+        timestamp   : Time
+    where
+        signatory manager
+        observer employee
+
+        choice AcceptWaterConsuption : FarmWaterStockCid
+            with farmWaterStockCid : FarmWaterStockCid
+            controller manager
+            do  
+                exercise farmWaterStockCid ConsumeWater with ..
+        
+        choice RejectWaterConsuption : RejectedRequestCid
+            with
+                reason : Text
+            controller manager
+            do
+                now <- getTime
+
+                create RejectedRequest with
+                    manager
+                    employee
+                    reason
+                    opType    = "Remove Water - Rejection"
+                    timestamp = now
+        
+        choice RevokeConsumeWaterRequest : ()
+            controller employee
+            do
+                return ()
+    
+template RejectedRequest
+    with
+        manager   : Party
+        employee  : Party
+        opType    : Text
+        reason    : Text
+        timestamp : Time
+    where
+        signatory manager
+        observer employee
+
+
+findFarmWaterIdWithKey manager farmWaterId =
+    lookupByKey @FarmWaterStock (manager, farmWaterId) >>= optional (assertFail $ "FarmWaterId "<> farmWaterId <> "not found") return
