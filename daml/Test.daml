@@ -5,68 +5,284 @@ import Daml.Script
 import DA.Time
 import DA.Date
 
-setupHappyPath : Script ()
-setupHappyPath = script do 
+data TestParties = TestParties 
+    with
+        employee   : Party
+        manager    : Party
+        supervisor : Party
 
-    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
-    manager <- allocatePartyWithHint "The Manager" (PartyIdHint "The Manager")
+setupTestParties : Text -> Text -> Text -> Script TestParties
+setupTestParties employee manager supervisor = script do
+    employee   <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
+    manager    <- allocatePartyWithHint "The Manager" (PartyIdHint "The Manager")
+    supervisor <- allocatePartyWithHint "Supervisor" (PartyIdHint "Supervisor")
+
+    return $ TestParties with
+        employee, manager, supervisor
+
+
+setupRequestAddWater : Script ()
+setupRequestAddWater = script do 
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
 
     farmWaterStockCid <- submit manager do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"
-                manager 
                 employee = bob
-                quantity = 100000.0
+                quantity = 0.0
                 timestamp = time (date 10 Jun 10) 01 01 01
+                ..
     
-    waterRequestCid <- submit bob do
-        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
-    
+    -- REQUEST ADD WATER
+    -- addQuantity less than 0 should fail
     submitMustFail bob do
-        exerciseCmd waterRequestCid AcceptAddWaterRequest
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = -1.0, supplier = "WaterInc"
 
-    newWaterCid <- submit manager do
-        exerciseCmd waterRequestCid AcceptAddWaterRequest
-
-    submit manager do
-        exerciseCmd newWaterCid ConsumeWater with remQuantity = 30000.0
-
-    return ()
+    -- empty supplier field should fail
+    submitMustFail bob do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = ""
     
-
-setupUnhappyPath : Script ()
-setupUnhappyPath = script do
-    bob <- allocatePartyWithHint "Bob" (PartyIdHint "Bob")
-    manager <- allocatePartyWithHint "The Manager" (PartyIdHint "The Manager")
-
-    farmWaterStockCid <- submit manager do
-        createCmd FarmWaterStock
-            with
-                farmWaterId = "farmWaterId1"
-                manager 
-                employee = bob
-                quantity = 100000.0
-                timestamp = time (date 10 Jun 10) 01 01 01
-
-
-    --RequestAddWater test addQuantity less or equal 0 
-    --                supplier empty
-
-
-    --WaterConsumptionRequest remQuantity less or equal 0 
-
-
-
+     -- request made by manager should fail
     submitMustFail manager do
         exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
     
+    -- Happy scenario should succeed
     waterRequestCid <- submit bob do
         exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 20000.0, supplier = "WaterInc"
 
+
+    -- ACCEPT ADD WATER REQUEST
+    -- request made by a employee(Bob) should fail
     submitMustFail bob do
         exerciseCmd waterRequestCid AcceptAddWaterRequest
+    
+    -- Happy scenario should succeed
+    submit manager do
+        exerciseCmd waterRequestCid AcceptAddWaterRequest
+    return ()
+
+setupRequestConsumeWater : Script ()
+setupRequestConsumeWater = script do 
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
+
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                quantity = 21000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    -- REQUEST CONSUME WATER
+    -- remQuantity less than 0 should fail
+    submitMustFail bob do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = -1.0
+
+    -- request made by manager should fail
+    submitMustFail manager do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = 20000.0
+    
+    -- Happy scenario should succeed
+    waterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = 20000.0
+
+    -- ACCEPT CONSUME WATER REQUEST
+    -- request made by a employee(Bob) should fail
+    submitMustFail bob do
+        exerciseCmd waterRequestCid AcceptWaterConsuption with farmWaterStockCid = farmWaterStockCid
+    
+    -- Happy scenario should succeed
+    submit manager do
+        exerciseCmd waterRequestCid AcceptWaterConsuption with farmWaterStockCid = farmWaterStockCid
+    
+    return ()
+
+setupConsumeWater : Script ()
+setupConsumeWater = script do
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
+
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                quantity = 22000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    -- CONSUME WATER
+    -- remQuantity less than 0 should fail
+    submitMustFail manager do
+        exerciseCmd farmWaterStockCid ConsumeWater with remQuantity = -1.0
+
+    -- request made by bob should fail
+    submitMustFail bob do
+        exerciseCmd farmWaterStockCid ConsumeWater with remQuantity = 20000.0
+    
+    -- Happy scenario should succeed
+    waterRequestCid <- submit manager do
+        exerciseCmd farmWaterStockCid ConsumeWater with remQuantity = 20000.0
 
     return ()
+
+
+setupRejectionFlowAndRevoke : Script ()
+setupRejectionFlowAndRevoke = script do
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
+
+    let farmWaterStock = FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                quantity = 22000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
     
+    farmWaterStockCid <- submit manager do
+        createCmd farmWaterStock
+            
+    -- REQUEST AND REVOKE
+    -- manager requesting Add Water should fail 
+    submitMustFail manager do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 100.0, supplier = "supplier"
+
+     -- manager requesting Consume Water should fail 
+    submitMustFail manager do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = 100.0
     
+    -- Happy scenario should succeed
+    addWaterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 100.0, supplier = "supplier"
+
+    consumeWaterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = 100.0
+    
+    -- Revoke by manager should fail
+    submitMustFail manager do
+        exerciseCmd addWaterRequestCid RevokeAddWaterRequest 
+    
+    submitMustFail manager do
+        exerciseCmd consumeWaterRequestCid RevokeConsumeWaterRequest 
+    
+    -- Happy scenario should succeed
+    submit bob do
+        exerciseCmd addWaterRequestCid RevokeAddWaterRequest 
+    
+    submit bob do
+        exerciseCmd consumeWaterRequestCid RevokeConsumeWaterRequest 
+
+
+    -- REJECTION FLOW
+    addWaterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid RequestAddWater with addQuantity = 100.0, supplier = "supplier"
+
+    consumeWaterRequestCid <- submit bob do
+        exerciseCmd farmWaterStockCid WaterConsumptionRequest with remQuantity = 100.0
+    
+    -- Happy scenario should succeed
+    submit manager do
+        exerciseCmd addWaterRequestCid RejectAddWaterRequest with reason = "I must fail this request for testing sake"
+
+    submit manager do
+        exerciseCmd consumeWaterRequestCid RejectWaterConsuption with reason = "I must fail this request again for testing sake, sorry"
+    return ()
+
+
+archivals : Script ()
+archivals = script do 
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
+
+    -- Contracts creation
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                quantity = 0.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    addWaterRequestCid <- submit bob do
+        createCmd AddWaterRequest
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                supplier = "supplier"
+                addQuantity = 100.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    consumeWaterRequestCid <- submit bob do
+        createCmd ConsumeWaterRequest
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                remQuantity = 10.0
+                description = "archiving Request"
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    rejectedRequestCid <- submit manager do
+        createCmd RejectedRequest
+            with
+                employee=bob  
+                opType = "none" 
+                reason = "archiving rejected request"
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+
+    -- Contracts archival
+    submit manager do
+        archiveCmd farmWaterStockCid
+    
+    submit bob do
+        archiveCmd addWaterRequestCid
+        
+    submit bob do
+        archiveCmd consumeWaterRequestCid
+
+    submit manager do
+        archiveCmd rejectedRequestCid
+    
+    return ()
+
+setup : Script ()
+setup = script do 
+
+    parties <- setupTestParties "bob" "manager" "supervisor"
+    let bob = parties.employee
+        manager = parties.manager 
+        supervisor = parties.supervisor
+
+    farmWaterStockCid <- submit manager do
+        createCmd FarmWaterStock
+            with
+                farmWaterId = "farmWaterId1"
+                employee = bob
+                quantity = 100000.0
+                timestamp = time (date 10 Jun 10) 01 01 01
+                ..
+    
+    return ()

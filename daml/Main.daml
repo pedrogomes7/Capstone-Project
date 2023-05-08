@@ -8,22 +8,17 @@ type FarmWaterStockCid      = ContractId FarmWaterStock
 type RejectedRequestCid     = ContractId RejectedRequest
 
 
--- verify all sigs and obs
--- verify timestamps
-
--- Testing : 
--- Test Revoke -> it should be right rn
-
 template FarmWaterStock
     with
         manager     : Party
         employee    : Party
+        supervisor  : Party
         quantity    : Decimal
         timestamp   : Time
         farmWaterId : Text
     where
         signatory manager
-        observer employee
+        observer employee, supervisor
 
         key (manager, farmWaterId) : (Party, Text)
         maintainer key._1
@@ -43,7 +38,7 @@ template FarmWaterStock
         nonconsuming choice WaterConsumptionRequest : ConsumeWaterRequestCid
             with
                 remQuantity : Decimal
-            controller employee 
+            controller employee
             do
                 assertMsg "Quantity to be consumed/ removed cannot be 0 or less " $ remQuantity >= 0.0
                 create ConsumeWaterRequest with 
@@ -67,12 +62,14 @@ template AddWaterRequest
     with
         manager     : Party
         employee    : Party
+        supervisor  : Party
         supplier    : Text
         farmWaterId : Text
         addQuantity : Decimal
+        timestamp   : Time
     where
-        signatory employee, manager
-        observer  manager
+        signatory employee
+        observer supervisor, manager
 
         choice AcceptAddWaterRequest : FarmWaterStockCid
             controller manager
@@ -94,11 +91,9 @@ template AddWaterRequest
                 now <- getTime
 
                 create RejectedRequest with
-                    manager
-                    employee
-                    reason
                     opType    = "Add Water - Rejection"
                     timestamp = now
+                    ..
         
         choice RevokeAddWaterRequest : ()
             controller employee
@@ -109,13 +104,14 @@ template ConsumeWaterRequest
     with
         manager     : Party
         employee    : Party
+        supervisor  : Party
         remQuantity : Decimal
         description : Text
         farmWaterId : Text
         timestamp   : Time
     where
-        signatory manager
-        observer employee
+        signatory employee
+        observer  supervisor, manager
 
         choice AcceptWaterConsuption : FarmWaterStockCid
             with farmWaterStockCid : FarmWaterStockCid
@@ -131,11 +127,9 @@ template ConsumeWaterRequest
                 now <- getTime
 
                 create RejectedRequest with
-                    manager
-                    employee
-                    reason
                     opType    = "Remove Water - Rejection"
                     timestamp = now
+                    ..
         
         choice RevokeConsumeWaterRequest : ()
             controller employee
@@ -144,14 +138,15 @@ template ConsumeWaterRequest
     
 template RejectedRequest
     with
-        manager   : Party
-        employee  : Party
-        opType    : Text
-        reason    : Text
-        timestamp : Time
+        manager    : Party
+        employee   : Party
+        supervisor : Party
+        opType     : Text
+        reason     : Text
+        timestamp  : Time
     where
         signatory manager
-        observer employee
+        observer employee, supervisor
 
 
 findFarmWaterIdWithKey manager farmWaterId =
