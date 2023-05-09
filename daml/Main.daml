@@ -17,8 +17,8 @@ template FarmWaterStock
         timestamp   : Time
         farmWaterId : Text
     where
-        signatory manager
-        observer employee, supervisor
+        signatory employee, manager
+        observer  supervisor
 
         key (manager, farmWaterId) : (Party, Text)
         maintainer key._1

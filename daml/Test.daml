@@ -29,7 +29,7 @@ setupRequestAddWater = script do
         manager = parties.manager 
         supervisor = parties.supervisor
 
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"
@@ -74,7 +74,7 @@ setupRequestConsumeWater = script do
         manager = parties.manager 
         supervisor = parties.supervisor
 
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"
@@ -115,7 +115,7 @@ setupConsumeWater = script do
         manager = parties.manager 
         supervisor = parties.supervisor
 
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"
@@ -156,7 +156,7 @@ setupRejectionFlowAndRevoke = script do
                 timestamp = time (date 10 Jun 10) 01 01 01
                 ..
     
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd farmWaterStock
             
     -- REQUEST AND REVOKE
@@ -215,7 +215,7 @@ archivals = script do
         supervisor = parties.supervisor
 
     -- Contracts creation
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"
@@ -254,7 +254,7 @@ archivals = script do
                 ..
 
     -- Contracts archival
-    submit manager do
+    submitMulti [bob, manager] [] do
         archiveCmd farmWaterStockCid
     
     submit bob do
@@ -276,7 +276,7 @@ setup = script do
         manager = parties.manager 
         supervisor = parties.supervisor
 
-    farmWaterStockCid <- submit manager do
+    farmWaterStockCid <- submitMulti [bob, manager] [] do
         createCmd FarmWaterStock
             with
                 farmWaterId = "farmWaterId1"

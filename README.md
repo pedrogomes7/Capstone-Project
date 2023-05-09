@@ -34,25 +34,14 @@ Parties involved :
 
 ## III. How to run the system
 
-### Start Daml Studio
-Start Daml Studio by running command `daml studio ` within the project folder. This command will start VS Code.
+### Daml Studio
+Daml Studio can be started by running command `daml studio ` when inside the project folder.
 
 ### Build
-In order to compile project run `daml build ` within the project folder. This command will build project according to config file daml.yaml. In particular it will download and install Daml SDK version specified in it.
+The project can be built by running command ` daml build `.
 
-In order to clean project run `daml clean ` within the project folder.
+### Clean
+The project built artifacts can be cleaned by running command ` daml clean `.
 
 ### Daml Sandbox
-You can start Sandbox ledger together with Navigator via a terminal window using Daml Assistant command `daml start`. The ledger will run in the background on port 6865.
-
-! First you will need to query for the allocated parties (as any party), and than copy "identifier" of a party to actAs given party. 
-Party identifier also can be found in Navigator.
-
-This token allows interaction with the JSON API, acting as the specified party.
-
-### Daml Navigator
-The Navigator is a React frontend application, for local use, included in the Daml SDK, that allows read/write operations on contracts, as an allocated party, to simplify use for non-technical persons.
-Start this service together with Sandbox via a terminal window by typing `daml start`.
-Command `daml start ` will build DAR files, start the sandbox, upload DAR files, run the init-script specified in daml config file, and launch Navigator. 
-The Navigator web-app is automatically started in your browser. If it fails to start, open a browser window and point it to the Navigator URL.
-When running daml start you will see the Navigator URL. By default it will be http://localhost:7500/.
+Daml Sandbox can be started by running command ` daml start `.
