@@ -17,7 +17,7 @@ Parties involved :
 
 
 ## II. Project Flow
-- The manager creates a **FarmWaterStock** contract with employee and supervisor as observers, a water quantity and some other fields.
+- The ledger is already started with a **FarmWaterStock** contract with employee and supervisor as observers, a water quantity and some other fields.
 
 - In case that the employee sees fit to propose a request of more water(quantity) he can do so by exercising the choice **RequestAddWater**. This choice takes a supplier field(this field is just a text field that records a supplier name, nothing else was implemented to not add up complexity) and the quantity that he sees fit and it creates a **AddWaterRequest** contract. After it :
     - The request can then be approved by the manager by exercising **AcceptAddWaterRequest**. This acceptance choice would create a new **FarmWaterStock** contract with the new water amount(quantity) and archive the previous one;
